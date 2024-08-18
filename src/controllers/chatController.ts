@@ -1,47 +1,122 @@
-import { Request, Response } from 'express';
-import { Chat } from '../models/chat';
-import { Message } from '../models/message';
-import { getRandomQuote } from '../services/quoteService';
+import { Request, Response, NextFunction } from 'express'
+import { Chat } from '../models/chatModel'
+import { Message } from '../models/messageModel'
+import { AppError } from '../utils/errorClass'
 
-export const createChat = async (req: Request, res: Response) => {
+export const createChat = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { firstName, lastName } = req.body;
-    const newChat = new Chat({ firstName, lastName, messages: [] });
-    await newChat.save();
-    res.status(201).json(newChat);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to create chat' });
-  }
-};
-
-export const sendMessage = async (req: Request, res: Response) => {
-  try {
-    const { chatId } = req.params;
-    const { content } = req.body;
-
-    const chat = await Chat.findById(chatId);
-    if (!chat) {
-      return res.status(404).json({ error: 'Chat not found' });
+    const { firstName, lastName } = req.body
+    if (!firstName || !lastName) {
+      throw new AppError('First name and last name are required', 400)
     }
 
-    const userMessage = new Message({ content, sender: 'user' });
-    await userMessage.save();
-
-    chat.messages.push(userMessage);
-    await chat.save();
-
-    setTimeout(async () => {
-      const botReply = await getRandomQuote();
-      const botMessage = new Message({ content: botReply, sender: 'bot' });
-      await botMessage.save();
-
-      chat.messages.push(botMessage);
-      await chat.save();
-
-      res.status(201).json({ userMessage, botMessage });
-    }, 3000);
-
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to send message' });
+    const newChat = new Chat({ firstName, lastName, messages: [] })
+    await newChat.save()
+    res.status(201).json(newChat)
+  } catch (err) {
+    next(new AppError('Failed to create chat', 400))
   }
-};
+}
+
+export const getChats = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const chats = await Chat.find()
+    res.status(200).json(chats)
+  } catch (err) {
+    next(new AppError('Failed to retrieve chats', 500))
+  }
+}
+
+export const getChatById = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const chat = await Chat.findById(req.params.id)
+    if (!chat) {
+      throw new AppError('Chat not found', 404)
+    }
+    res.status(200).json(chat)
+  } catch (err) {
+    next(new AppError('Failed to retrieve chat', 500))
+  }
+}
+
+export const updateChat = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const updatedChat = await Chat.findByIdAndUpdate(req.params.id, {
+      firstName: req.body.firstName,
+      lastName: req.body.lastName,
+    })
+    if (!updatedChat) {
+      throw new AppError('Chat not found', 404)
+    }
+    res.status(200).json(updatedChat)
+  } catch (err) {
+    next(new AppError('Failed to update chat', 400))
+  }
+}
+
+export const deleteChat = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const deletedChat = await Chat.findByIdAndDelete(req.params.id)
+    if (!deletedChat) {
+      throw new AppError('Chat not found', 404)
+    }
+    res.status(200).json({ message: 'Chat deleted successfully' })
+  } catch (err) {
+    next(new AppError('Failed to delete chat', 500))
+  }
+}
+
+export const sendMessage = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { text } = req.body
+
+    if (!text) {
+      throw new AppError('Message text is required', 400)
+    }
+
+    const chat = await Chat.findById(req.params.id)
+    if (!chat) {
+      throw new AppError('Chat not found', 404)
+    }
+
+    const newMessage = new Message({
+      content: text,
+      sender: 'user',
+    })
+
+    const savedMessage = (await newMessage.save()) as any
+
+    chat.messages.push(savedMessage._id)
+    await chat.save()
+
+    res.status(201).json(savedMessage)
+
+    // // Логіка для авто-відповіді через 3 секунди
+    // setTimeout(async () => {
+    //   try {
+    //     // Створення авто-відповіді
+    //     const autoReplyMessage = new Message({
+    //       content: 'This is an automated response',
+    //       sender: 'bot', // Відповідь від бота
+    //     });
+
+    //     // Збереження авто-відповіді
+    //     await autoReplyMessage.save();
+
+    //     // Додавання авто-відповіді до чату
+    //     chat.messages.push(autoReplyMessage._id);
+    //     await chat.save();
+
+    //     // Можливо, тут слід відправити повідомлення клієнту через WebSocket або інший метод
+    //     // для оновлення чату в реальному часі
+
+    //   } catch (err) {
+    //     console.error('Failed to send auto-response:', err);
+    //     // Можна обробити помилку авто-відповіді, якщо потрібно
+    //   }
+    // }, 3000); // Затримка 3 секунди
+    // // logic to send auto-response after 3 seconds
+  } catch (err) {
+    next(new AppError('Failed to send message', 400))
+  }
+}
