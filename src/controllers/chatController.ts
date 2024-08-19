@@ -20,7 +20,7 @@ export const createChat = async (req: Request, res: Response, next: NextFunction
 
 export const getChats = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const chats = await Chat.find()
+    const chats = await Chat.find().populate('messages')
     res.status(200).json(chats)
   } catch (err) {
     next(new AppError('Failed to retrieve chats', 500))
@@ -29,7 +29,7 @@ export const getChats = async (req: Request, res: Response, next: NextFunction) 
 
 export const getChatById = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const chat = await Chat.findById(req.params.id)
+    const chat = await Chat.findById(req.params.id).populate('messages')
     if (!chat) {
       throw new AppError('Chat not found', 404)
     }
@@ -56,10 +56,12 @@ export const updateChat = async (req: Request, res: Response, next: NextFunction
 
 export const deleteChat = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const deletedChat = await Chat.findByIdAndDelete(req.params.id)
-    if (!deletedChat) {
+    const chat = await Chat.findById(req.params.id)
+    if (!chat) {
       throw new AppError('Chat not found', 404)
     }
+    await Message.deleteMany({ _id: { $in: chat.messages } })
+    await Chat.deleteOne({ _id: req.params.id })
     res.status(200).json({ message: 'Chat deleted successfully' })
   } catch (err) {
     next(new AppError('Failed to delete chat', 500))
