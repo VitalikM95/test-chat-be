@@ -4,7 +4,8 @@
   "description": "api for test chat",
   "main": "index.js",
   "scripts": {
-    "start": "nodemon"
+    "build": "tsc",
+    "start": "node dist/index.js"
   },
   "author": "",
   "license": "ISC",
