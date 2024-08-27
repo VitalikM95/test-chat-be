@@ -1,23 +1,17 @@
-import { Schema, model, Document } from 'mongoose'
-import { IMessage } from './messageModel'
+import mongoose, { Schema, Document } from 'mongoose'
 
-export interface IChat extends Document {
-  firstName: string
-  lastName: string
-  messages: IMessage[]
-  createdAt: Date
-  updatedAt: Date
+interface IData extends Document {
+  name?: string
+  mail?: string
+  hiddenText?: string
 }
 
-const ChatSchema = new Schema<IChat>(
-  {
-    firstName: { type: String, required: true },
-    lastName: { type: String, required: true },
-    messages: [{ type: Schema.Types.ObjectId, ref: 'Message' }],
-  },
-  {
-    timestamps: true,
-  }
-)
+const DataSchema: Schema = new Schema({
+  name: { type: String, required: false },
+  mail: { type: String, required: false },
+  hiddenText: { type: String, required: false },
+})
 
-export const Chat = model<IChat>('Chat', ChatSchema)
+const DataModel = mongoose.model<IData>('Data', DataSchema)
+
+export default DataModel
